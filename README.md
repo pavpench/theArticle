@@ -87,7 +87,9 @@ Notice that the solution should work even if the user decides to close their bro
 in order to accomplish that you will probably need to use redis or cookies or both. You have an example of 
 how to use both these services in `public/api/index.php`.
 
-Even that redis is an in-memory database, you are free to use it as if it was a traditional one.
+Even that redis is an in-memory database, you are free to use it as if it was a traditional one
+(i.e. for simplification purposes, you can safely assume the redis server will never be restarted,
+there is no key eviction mechanism, and so on).
 
 
 #### A few clues...

@@ -24,45 +24,94 @@ $errorMiddleware = $app->addErrorMiddleware(true, true, true);
 /** TODO
  * Here you can write your own API endpoints.
  * You can use Redis and/or cookies for data persistence. */
-
  
- //Soft login for storing initial information of User 
-$app->post("/login/{name}",function(Request $request, Response $response, $args){
+ //Format date based on timezone 
+function formatDateTime($timestamp, $zone="Asia/Shanghai", $format = "d/m/Y H:i:s") {
+    $date = new \DateTime($zone);
+    $date->setTimeZone(new \DateTimeZone($zone));
+    $date->setTimeStamp($timestamp);
+    $result = $date->format($format);
+    return $result;
+}
+
+ //Soft login for storing initial info of User 
+ $app->get("/login/{name}",function(Request $request, Response $response, $args){
+     $redisClient = $this->get("redisClient");
+
+     
+     $timeStarted = time();
+     $loggedName = $args["name"];
+     $userData = $redisClient->hGetAll($loggedName);
     
-    $loggedName = $args["name"];
-    $redisClient = $this->get("redisClient");
-    $userData = $redisClient->hgetall($loggedName);
-    $reqBody = $request->getParsedBody();
-    $timeStarted = $reqBody["timeStart"];
-    
-     if($userData["userName"]){
-        $response->getBody()->write(json_encode([$loggedName=>$userData,"salutation"=>"Hello $loggedName"], JSON_THROW_ON_ERROR));
-    
+    //Check for previous logins for current user or create new entry if none
+    if($userData["userName"]){
+        $redisClient->hmSet($loggedName,"sessionStart","$timeStarted");
+        $response->getBody()->write(json_encode([$loggedName=>$userData,"salutation"=>"Welcome back $loggedName"], JSON_THROW_ON_ERROR));
     }else{
-        $redisClient->hmset($loggedName,
+        //Initialize user data in Redis if none present
+        $redisClient->hmSet($loggedName,
         "userName", $loggedName,
-        "startReadTime",$timeStarted,"currentReadTime","00:00:00","endReadTime","00:00:00");
+        "startReadTime",formatDateTime($timeStarted),"sessionStart","$timeStarted","overallTimeSpent","0","endReadTime","00:00:00");
+        $userData = $redisClient->hGetAll($loggedName);
         
-        $response->getBody()->write(json_encode(["response"=>"Thank you for logging in"]));
-        
+        $response->getBody()->write(json_encode([
+            $loggedName=>$userData,
+            "salutation"=>"Thank you for logging in"],JSON_THROW_ON_ERROR));
     };
+    
     return $response->withHeader("Content-Type","application/json");
 });
+
 // Storing info for session time in case of not full read
-$app->post("/sessionOver/{name}",function(Request $request,Response $response, $args){
+$app->get("/endSession/{name}",function(Request $request,Response $response, $args){
+    $redisClient = $this->get("redisClient");
+    $loggedName = $args["name"];
     
+    //Possible middleware to avoid redundance
+    $now = time(); //current timestamp
+    $currentSessionStart = (int)$redisClient->hGet($loggedName,"sessionStart");
+    $previousOverallTime = (int)$redisClient->hGet($loggedName,"overallTimeSpent");
+    $currentSessionTime = ($now-$currentSessionStart);
+    $newOverallTimeSpent= $previousOverallTime+$currentSessionTime;
+    
+    //<-
+    
+    $redisClient->hSet($loggedName,"overallTimeSpent","$newOverallTimeSpent");
+    
+    $response->getBody()->write(json_encode([
+    "status"=>"200 OK"        
+    ]));
+    return $response->withHeader("Content-Type","application/json");
 });
+
 // Providing details for startTime, endTime, overallTimeSpent
-$app->get("/finnishedRead/{name}",function(Request $request,Response $response,$args){
+$app->get("/finishRead/{name}",function(Request $request,Response $response,$args){
+    $redisClient = $this->get("redisClient");
+    $loggedName = $args["name"];
+    $endReadTime = time();
     
+    //Possible middleware to avoid redundance
+    $now = time(); //current timestamp
+    $currentSessionStart = (int)$redisClient->hGet($loggedName,"sessionStart");
+    $previousOverallTime = (int)$redisClient->hGet($loggedName,"overallTimeSpent");
+    $currentSessionTime = ($now-$currentSessionStart) ;
+    $newOverallTimeSpent= $previousOverallTime+$currentSessionTime;
+    $formatOverallTime=date("H:i:s",$newOverallTimeSpent);
+    //<-
+    
+    $redisClient->hSet($loggedName, "endReadTime", formatDateTime($endReadTime),"overallTimeSpent","$formatOverallTime");
+
+    $userData = $redisClient->hgetall($loggedName);
+    
+    $response->getBody()->write(json_encode([$loggedName=>$userData]));
+    
+    return $response->withHeader("Content-Type","application/json");
 });
 
 
 
 /*Find below an example of a GET endpoint that uses redis to temporarily store a name,
  and cookies to keep track of an event date and time. */
-
-
  $app->get('/hello/{name}', function (Request $request, Response $response, $args) {
     // Redis usage example:
     /** @var \Predis\Client $redisClient */
@@ -74,7 +123,7 @@ $app->get("/finnishedRead/{name}",function(Request $request,Response $response,$
         $redisClient->set('name', $args['name'], 'EX', 10);
         $name = $args['name'];
     }
-
+    
     // Setting a cookie example:
     $cookieValue = '';
     if (empty($_COOKIE["FirstSalutationTime"])) {
@@ -83,14 +132,14 @@ $app->get("/finnishedRead/{name}",function(Request $request,Response $response,$
         $expires = time() + 60 * 60 * 24 * 30; // 30 days.
         setcookie($cookieName, $cookieValue, $expires, '/');
     }
-
+    
     // Response example:
     $response->getBody()->write(json_encode([
         'name' => $name,
         'salutation' => "Hello, $name!",
         'first_salutation_time' => $_COOKIE["FirstSalutationTime"] ?? $cookieValue,
     ], JSON_THROW_ON_ERROR));
-
+    
     return $response->withHeader('Content-Type', 'application/json');
 });
 

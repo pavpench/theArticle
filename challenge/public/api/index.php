@@ -26,7 +26,7 @@ $errorMiddleware = $app->addErrorMiddleware(true, true, true);
  * You can use Redis and/or cookies for data persistence. */
  
  //Format date based on timezone 
-function formatDateTime($timestamp, $zone="Asia/Shanghai", $format = "d/m/Y H:i:s") {
+function formatDateTime($timestamp, $zone="Asia/Singapore", $format = "H:i:s d/m/Y") {
     $date = new \DateTime($zone);
     $date->setTimeZone(new \DateTimeZone($zone));
     $date->setTimeStamp($timestamp);

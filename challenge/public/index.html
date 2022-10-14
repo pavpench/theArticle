@@ -44,7 +44,7 @@
         margin: 0 auto;
         padding: 0.3rem;
       }
-      #login_Modal {
+      .modal {
         display: none;
         position: fixed;
         z-index: 1;
@@ -54,6 +54,16 @@
         background-color: rgba(0, 0, 0, 0.4);
       }
       #login_form {
+        display: none;
+        background-color: #fefefe;
+        margin: 15% auto;
+        padding: 2rem;
+        border: 1px solid #888;
+        width: 25%;
+        height: 10rem;
+      }
+      #userDataPresent {
+        display: none;
         background-color: #fefefe;
         margin: 15% auto;
         padding: 2rem;
@@ -83,16 +93,22 @@
     <nav class="read-progress">
       <div id="progressBar"> </div>
       <div class="msg-screen">
-        <h1> Welcome to the Article </h1>
+        <h1 id="welcomeMSG"> Welcome to the Article </h1>
       </div>
     </nav>
     <main>
-      <div id="login_Modal">
+      <div class="modal">
         <form id="login_form">
           <label for="fname">Please introduce yourself...</label>
           <input type="text" id="fname" size="15" placeholder="First name" />
           <button id="btn_submit">Submit</button>
         </form>
+        <div id="userDataPresent">
+          <h3 id="thankYou"></h3>
+          <p id="timeStarted"></p>
+          <p id="timeSpent"></p>
+          <p id="finnished"></p>
+        </div>
       </div>
       <section id="article">
         <h1>HTML Ipsum Presents</h1>
@@ -445,48 +461,67 @@
       //Scroll progress measure
       let articleElem = document.querySelector("#article");
       let progressBar = document.querySelector("#progressBar");
-      let processScroll = (elem, progressBar) => {
+
+      let scrollPosition = (elem, progressBar) => {
         let scrollTop = elem["scrollTop"];
         let scrollBottom = elem["scrollHeight"] - elem["offsetHeight"];
-        let scrollAmount = (scrollTop / scrollBottom) * 100 + "%";
-        console.log(scrollAmount);
+        let scrollPosition = (scrollTop / scrollBottom) * 100;
+        let scrollAmount = scrollPosition + "%";
         progressBar.style.setProperty("--scrollAmount", scrollAmount);
+        return scrollPosition;
       };
-      articleElem.addEventListener("scroll", (e) => {
-        processScroll(articleElem, progressBar);
-      });
+      // articleElem.addEventListener("scroll", (e) => {
+      //   scrollPosition(articleElem, progressBar);
+      //   if (scrollPosition(articleElem, progressBar) === 100) {
+      //     console.log("finish read");
+      //     modalRender(userDataPresentModal);
+      //   }
+      // });
     </script>
     <script>
       //Login modal manage
       let body = document.querySelector("body");
-      let modal = document.querySelector("#login_modal");
+      let modalContainer = document.querySelector(".modal");
+      let loginModal = document.querySelector("#login_form");
+      let userDataPresentModal = document.querySelector("#userDataPresent");
       let formWindow = document.querySelector("#login_form");
       let btn_submit = document.querySelector("#btn_submit");
       let firstName = document.querySelector("#fname");
+
       function modalRender(modal) {
+        modalContainer.style.display = "block";
+
         modal.style.display = "block";
       }
+
+      //Server communication
       async function serverComms(url = ``) {
         let response = await fetch(url, {
-          method: "POST",
+          method: "GET",
           mode: "cors",
           headers: { "Content-Type": "application/json" },
         });
         return response;
       }
 
+      //Sending name to API for storage of Start read time
       function softLogin(firstName) {
+        //Simple name verification for number of letters, more verifications needed* for better security
         if (firstName.value.length < 2 || firstName.value.length > 20) {
           errorMessage = document.createElement("div");
-          errorMessage.innerText = `${firstName.value} is not a valid name. Please add a name with more than ${firstName.value.length} letter`;
+          errorMessage.innerText = `Not a valid name. Please add a name with not less than 2 or more than 20 characters`;
           formWindow.appendChild(errorMessage);
           setTimeout(() => {
             formWindow.removeChild(errorMessage);
-          }, 5000);
+          }, 3000);
         } else {
-          modal.style.display = "none";
+          document.querySelector(
+            "#welcomeMSG"
+          ).innerText = `Welcome ${firstName.value}`;
+          loginModal.style.display = "none";
+          modalContainer.style.display = "none";
           serverComms(`http://localhost:8087/api/login/${firstName.value}`)
-            .then((res) => console.log(res))
+            .then((res) => res.json())
             .then((data) => {
               console.log(data);
             })
@@ -495,11 +530,63 @@
             });
         }
       }
-
-      body.addEventListener("load", modalRender(modal));
+      //User introduction modal on page load
+      body.addEventListener("load", modalRender(loginModal));
       btn_submit.addEventListener("click", (e) => {
         e.preventDefault();
         softLogin(firstName);
+      });
+
+      //Close/refresh window API request to store User session time
+      window.addEventListener("beforeunload", () => {
+        serverComms(`http://localhost:8087/api/endSession/${firstName.value}`)
+          .then((res) => res.json())
+          .then((data) => {
+            console.log(data);
+          })
+          .catch(function (err) {
+            localStorage.setItem("err", `${err}`);
+            console.error("Something went wrong.", err);
+          });
+        for (let index = 0; index < 5000; index++) {
+          console.log("Storing your session time");
+        }
+      });
+
+      //Scroll progress measure and action based on current read progress
+      articleElem.addEventListener("scroll", (e) => {
+        scrollPosition(articleElem, progressBar);
+        if (scrollPosition(articleElem, progressBar) === 100) {
+          console.log("finish read");
+          modalRender(userDataPresentModal);
+          serverComms(`http://localhost:8087/api/finishRead/${firstName.value}`)
+            .then((res) => res.json())
+            .then((data) => {
+              console.log(data[firstName.value].userName);
+              document.querySelector(
+                "#thankYou"
+              ).innerText = `Thank you for enjoying the Article ${
+                data[firstName.value].userName
+              }`;
+              document.querySelector(
+                "#timeStarted"
+              ).innerText = `You started reading on ${
+                data[firstName.value].startReadTime
+              }`;
+              document.querySelector("#timeSpent").innerText = `You spent ${
+                data[firstName.value].overallTimeSpent
+              } to read the article`;
+              document.querySelector(
+                "#finnished"
+              ).innerText = `You finished reading on ${
+                data[firstName.value].endReadTime
+              }`;
+            })
+            .catch(function (err) {
+              localStorage.setItem("err", `${err}`);
+              console.error("Something went wrong.", err);
+            });
+        }
       });
     </script>
   </body>

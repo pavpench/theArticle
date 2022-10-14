@@ -68,7 +68,7 @@
         margin: 15% auto;
         padding: 2rem;
         border: 1px solid #888;
-        width: 25%;
+        width: 35%;
         height: 10rem;
       }
 
@@ -108,6 +108,7 @@
           <p id="timeStarted"></p>
           <p id="timeSpent"></p>
           <p id="finnished"></p>
+          <button id="userDataModalHide"> Thank you</button>
         </div>
       </div>
       <section id="article">
@@ -470,13 +471,6 @@
         progressBar.style.setProperty("--scrollAmount", scrollAmount);
         return scrollPosition;
       };
-      // articleElem.addEventListener("scroll", (e) => {
-      //   scrollPosition(articleElem, progressBar);
-      //   if (scrollPosition(articleElem, progressBar) === 100) {
-      //     console.log("finish read");
-      //     modalRender(userDataPresentModal);
-      //   }
-      // });
     </script>
     <script>
       //Login modal manage
@@ -487,10 +481,10 @@
       let formWindow = document.querySelector("#login_form");
       let btn_submit = document.querySelector("#btn_submit");
       let firstName = document.querySelector("#fname");
+      let finalModalClose = document.querySelector("#userDataModalHide");
 
       function modalRender(modal) {
         modalContainer.style.display = "block";
-
         modal.style.display = "block";
       }
 
@@ -522,9 +516,7 @@
           modalContainer.style.display = "none";
           serverComms(`http://localhost:8087/api/login/${firstName.value}`)
             .then((res) => res.json())
-            .then((data) => {
-              console.log(data);
-            })
+            .then((data) => {})
             .catch(function (err) {
               console.error("Something went wrong.", err);
             });
@@ -541,14 +533,13 @@
       window.addEventListener("beforeunload", () => {
         serverComms(`http://localhost:8087/api/endSession/${firstName.value}`)
           .then((res) => res.json())
-          .then((data) => {
-            console.log(data);
-          })
+          .then((data) => {})
           .catch(function (err) {
             localStorage.setItem("err", `${err}`);
             console.error("Something went wrong.", err);
           });
-        for (let index = 0; index < 5000; index++) {
+        //Hold on window close in order to finnish request for ending session- Better idea needed
+        for (let index = 0; index < 2500; index++) {
           console.log("Storing your session time");
         }
       });
@@ -557,12 +548,10 @@
       articleElem.addEventListener("scroll", (e) => {
         scrollPosition(articleElem, progressBar);
         if (scrollPosition(articleElem, progressBar) === 100) {
-          console.log("finish read");
           modalRender(userDataPresentModal);
           serverComms(`http://localhost:8087/api/finishRead/${firstName.value}`)
             .then((res) => res.json())
             .then((data) => {
-              console.log(data[firstName.value].userName);
               document.querySelector(
                 "#thankYou"
               ).innerText = `Thank you for enjoying the Article ${
@@ -587,6 +576,12 @@
               console.error("Something went wrong.", err);
             });
         }
+      });
+      // UserDataPresent modal remove for possibility to read text after finnishing it
+      finalModalClose.addEventListener("click", (e) => {
+        e.preventDefault();
+        userDataPresentModal.style.display = "none";
+        modalContainer.style.display = "none";
       });
     </script>
   </body>

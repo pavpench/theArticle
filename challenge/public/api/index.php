@@ -18,12 +18,25 @@ $app = AppFactory::create();
 $app->setBasePath('/api');
 $app->addRoutingMiddleware();
 
-$errorMiddleware = $app->addErrorMiddleware(true, true, true);
+$app->options('/{routes:.+}', function ($request, $response, $args) {
+    return $response;
+});
 
+$errorMiddleware = $app->addErrorMiddleware(true, true, true);
 
 /** TODO
  * Here you can write your own API endpoints.
  * You can use Redis and/or cookies for data persistence. */
+ 
+ //CORS setup 
+ $app->add(function ($request, $handler) {
+    $response = $handler->handle($request);
+    return $response
+            ->withHeader('Access-Control-Allow-Origin', '*') 
+            ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
+            ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+});
+ 
  
  //Format date based on timezone 
 function formatDateTime($timestamp, $zone="Asia/Singapore", $format = "H:i:s d/m/Y") {
@@ -35,7 +48,7 @@ function formatDateTime($timestamp, $zone="Asia/Singapore", $format = "H:i:s d/m
 }
 
  //Soft login for storing initial info of User 
- $app->get("/login/{name}",function(Request $request, Response $response, $args){
+ $app->post("/login/{name}",function(Request $request, Response $response, $args){
      $redisClient = $this->get("redisClient");
 
      
@@ -58,8 +71,8 @@ function formatDateTime($timestamp, $zone="Asia/Singapore", $format = "H:i:s d/m
             $loggedName=>$userData,
             "salutation"=>"Thank you for logging in"],JSON_THROW_ON_ERROR));
     };
+    return $response;
     
-    return $response->withHeader("Content-Type","application/json");
 });
 
 // Storing info for session time in case of not full read
@@ -81,7 +94,7 @@ $app->get("/endSession/{name}",function(Request $request,Response $response, $ar
     $response->getBody()->write(json_encode([
     "status"=>"200 OK"        
     ]));
-    return $response->withHeader("Content-Type","application/json");
+    return $response;
 });
 
 // Providing details for startTime, endTime, overallTimeSpent
@@ -105,7 +118,7 @@ $app->get("/finishRead/{name}",function(Request $request,Response $response,$arg
     
     $response->getBody()->write(json_encode([$loggedName=>$userData]));
     
-    return $response->withHeader("Content-Type","application/json");
+    return $response;
 });
 
 
@@ -140,7 +153,7 @@ $app->get("/finishRead/{name}",function(Request $request,Response $response,$arg
         'first_salutation_time' => $_COOKIE["FirstSalutationTime"] ?? $cookieValue,
     ], JSON_THROW_ON_ERROR));
     
-    return $response->withHeader('Content-Type', 'application/json');
+    return $response;
 });
 
 

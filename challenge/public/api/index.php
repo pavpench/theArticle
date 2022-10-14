@@ -34,7 +34,7 @@ $errorMiddleware = $app->addErrorMiddleware(true, true, true);
     return $response
             ->withHeader('Access-Control-Allow-Origin', '*') 
             ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
-            ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+            ->withHeader('Access-Control-Allow-Methods', 'GET');
 });
  
  
@@ -48,10 +48,8 @@ function formatDateTime($timestamp, $zone="Asia/Singapore", $format = "H:i:s d/m
 }
 
  //Soft login for storing initial info of User 
- $app->post("/login/{name}",function(Request $request, Response $response, $args){
+ $app->get("/login/{name}",function(Request $request, Response $response, $args){
      $redisClient = $this->get("redisClient");
-
-     
      $timeStarted = time();
      $loggedName = $args["name"];
      $userData = $redisClient->hGetAll($loggedName);

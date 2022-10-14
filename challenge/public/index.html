@@ -90,7 +90,7 @@
       <div id="login_Modal">
         <form id="login_form">
           <label for="fname">Please introduce yourself...</label>
-          <input type="text" id="fname" placeholder="First name" />
+          <input type="text" id="fname" size="15" placeholder="First name" />
           <button id="btn_submit">Submit</button>
         </form>
       </div>
@@ -458,15 +458,49 @@
     </script>
     <script>
       //Login modal manage
-      let modal = document.querySelector("#login_modal");
       let body = document.querySelector("body");
+      let modal = document.querySelector("#login_modal");
+      let formWindow = document.querySelector("#login_form");
       let btn_submit = document.querySelector("#btn_submit");
+      let firstName = document.querySelector("#fname");
       function modalRender(modal) {
         modal.style.display = "block";
       }
-      body.addEventListener("load", modalRender(modal));
+      async function serverComms(url = ``) {
+        let response = await fetch(url, {
+          method: "POST",
+          mode: "cors",
+          headers: { "Content-Type": "application/json" },
+        });
+        return response;
+      }
 
-      function softLogin() {}
+      function softLogin(firstName) {
+        if (firstName.value.length < 2 || firstName.value.length > 20) {
+          errorMessage = document.createElement("div");
+          errorMessage.innerText = `${firstName.value} is not a valid name. Please add a name with more than ${firstName.value.length} letter`;
+          formWindow.appendChild(errorMessage);
+          setTimeout(() => {
+            formWindow.removeChild(errorMessage);
+          }, 5000);
+        } else {
+          modal.style.display = "none";
+          serverComms(`http://localhost:8087/api/login/${firstName.value}`)
+            .then((res) => console.log(res))
+            .then((data) => {
+              console.log(data);
+            })
+            .catch(function (err) {
+              console.error("Something went wrong.", err);
+            });
+        }
+      }
+
+      body.addEventListener("load", modalRender(modal));
+      btn_submit.addEventListener("click", (e) => {
+        e.preventDefault();
+        softLogin(firstName);
+      });
     </script>
   </body>
 </html>
